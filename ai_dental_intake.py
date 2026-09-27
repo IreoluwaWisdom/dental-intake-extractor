@@ -23,8 +23,6 @@ class PatientIntake(BaseModel):
     duration_days: int | None = None
     symptoms: Symptoms | None = None
 
-patient_description = input("What is the issue you have: ")
-
 def extract_patient_intake(patient_description: str):
     response = client.chat.completions.create(
         model="openai/gpt-oss-20b",
@@ -64,6 +62,9 @@ def extract_patient_intake(patient_description: str):
 
 
 def main():
+    patient_description = input("What is the issue you have: ")
+
+
     try:
         patient_intake = extract_patient_intake(patient_description)
         print(patient_intake)

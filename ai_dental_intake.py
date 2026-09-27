@@ -1,13 +1,14 @@
+import json
 import os
+
 from dotenv import load_dotenv
 from openai import OpenAI
-from pydantic import BaseModel, ValidationError, Field
-import json
+from pydantic import BaseModel, Field, ValidationError
 
 load_dotenv()
 
 client = OpenAI(
-    api_key = os.getenv("GROQ_API_KEY"),
+    api_key=os.getenv("GROQ_API_KEY"),
     base_url="https://api.groq.com/openai/v1"
 )
 
@@ -22,84 +23,61 @@ class PatientIntake(BaseModel):
     duration_days: int | None = None
     symptoms: Symptoms | None = None
 
-patient =  PatientIntake(
-    complaint="severe tooth pain",
-    duration_days=3,
-    symptoms={
-        "swelling": True,
-        "bleeding": True,
-        "fever": None
-    }
-)
-
-# print(patient)
-
-# patient_description = """
-# My tooth has been hurting badly for about three days.
-# My cheek is swollen and it bleeds sometimes when I brush.
-# I don't think I have a fever.
-# """
-
 patient_description = input("What is the issue you have: ")
 
-print(patient_description)
+def extract_patient_intake(patient_description: str):
+    response = client.chat.completions.create(
+        model="openai/gpt-oss-20b",
+        messages = [
+            {
+        "role": "system",
+        "content": """
+    Extract information from the dental patient's description.
 
+    Return ONLY valid JSON using exactly this structure:
 
-response = client.chat.completions.create(
-    model="openai/gpt-oss-20b",
-    messages = [
-        {
-    "role": "system",
-    "content": """
-Extract information from the dental patient's description.
-
-Return ONLY valid JSON using exactly this structure:
-
-{
-    "complaint": "string",
-    "duration_days": integer or null,
-    "symptoms": {
-        "swelling": true, false, or null,
-        "bleeding": true, false, or null,
-        "fever": true, false, or null
-    }
-}
-
-Do not invent information that the patient did not provide.
-"""
-},
-        {
-            "role": "user",
-            "content": patient_description
+    {
+        "complaint": "string",
+        "duration_days": integer or null,
+        "symptoms": {
+            "swelling": true, false, or null,
+            "bleeding": true, false, or null,
+            "fever": true, false, or null
         }
-    ]
-)
+    }
 
-# print(response.choices[0].message.content)
+    Do not invent information that the patient did not provide.
+    """
+    },
+            {
+                "role": "user",
+                "content": patient_description
+            }
+        ]
+    )
 
-llm_output = response.choices[0].message.content
+    llm_output = response.choices[0].message.content
 
-# llm_output = "This is not JSON"
-
-# data["duration_days"] = "three bananas"
-
-try:
     data = json.loads(llm_output)
 
-    patient_intake = PatientIntake.model_validate(data)
-    print(patient_intake)
+    return PatientIntake.model_validate(data)
 
-except json.JSONDecodeError as error:
-    print("The AI returned invalid JSON")
-    print(error)
 
-except ValidationError as error:
-    print("The AI output did not match the PatientIntake structure.")
-    print(error)
+def main():
+    try:
+        patient_intake = extract_patient_intake(patient_description)
+        print(patient_intake)
 
-# print(data)
+    except json.JSONDecodeError as error:
+        print("The AI returned invalid JSON")
+        print(error)
 
-# print(type(llm_output))
-# print(type(data))
+    except ValidationError as error:
+        print("The AI output did not match the PatientIntake structure.")
+        print(error)
 
-# print(data["duration_days"])
+
+
+
+if __name__ == "__main__":
+    main()
